@@ -1,5 +1,6 @@
 require "./lib_zlib"
 require "./deflate"
+require "./deflate_io"
 require "./inflate"
 require "./gzfile"
 
