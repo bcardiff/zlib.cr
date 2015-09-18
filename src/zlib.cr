@@ -2,6 +2,7 @@ require "./lib_zlib"
 require "./deflate"
 require "./deflate_io"
 require "./inflate"
+require "./inflate_io"
 require "./gzfile"
 
 module Zlib
