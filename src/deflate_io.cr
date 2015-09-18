@@ -1,5 +1,3 @@
-require  "./deflate"
-
 module Zlib
   class DeflateIO
     include IO
@@ -10,7 +8,7 @@ module Zlib
       @buf_read_from :: UInt32   # @buf_read_from/@buf_read_amount represents
       @buf_read_amount :: UInt32 #   the slice of the buffer available for the consumer of the IO
       @input_buf :: UInt8[8192]  # input buffer used by zlib
-
+      @flush :: LibZ::Flush
       @stream = LibZ::ZStream.new
       ret = LibZ.deflateInit2(pointerof(@stream), level, LibZ::Z_DEFLATED, wbits, mem_level,
                               strategy, LibZ.zlibVersion(), sizeof(LibZ::ZStream))
@@ -22,7 +20,7 @@ module Zlib
     def read(slice : Slice(UInt8))
       # if there is output data not consumed, consume it and return.
       if @buf_read_amount > 0
-        return read_and_consume_buffer_full(slice)
+        return read_and_consume_buffer(slice)
       end
 
       # the output buffer is free to be reused
@@ -31,14 +29,14 @@ module Zlib
       consume_from_input_and_prepare_output
 
       # countinue reading from IO until some output is generated in order to avoid read with zero bytes as result
-      if flush == LibZ::Flush::NO_FLUSH
+      if @flush == LibZ::Flush::NO_FLUSH
         while @buf_read_amount == 0
           consume_from_input_and_prepare_output
         end
       end
 
       if @buf_read_amount > 0
-        return read_and_consume_buffer_full(slice)
+        return read_and_consume_buffer(slice)
       else
         return 0u32
       end
@@ -61,15 +59,6 @@ module Zlib
       @buf_read_amount = 0u32
     end
 
-    private def read_and_consume_buffer_full(slice)
-      read = read_and_consume_buffer(slice)
-      if slice.length - read > 0
-        read + self.read(slice + read)
-      else
-        read
-      end
-    end
-
     private def read_and_consume_buffer(slice)
       to_read = Math.min(slice.length.to_u32, @buf_read_amount)
       slice.copy_from((@buf.to_slice + @buf_read_from).to_unsafe, to_read)
@@ -87,8 +76,8 @@ module Zlib
       end
 
       # if input io is at the very end, perform a FINISH
-      flush = @stream.avail_in == 0 && read == 0 ? LibZ::Flush::FINISH : LibZ::Flush::NO_FLUSH
-      ret = LibZ.deflate(pointerof(@stream), flush)
+      @flush = @stream.avail_in == 0 && read == 0 ? LibZ::Flush::FINISH : LibZ::Flush::NO_FLUSH
+      ret = LibZ.deflate(pointerof(@stream), @flush)
       check_error(ret)
 
       # output buffer is assumed free to be reused (there was a reset_state call)
