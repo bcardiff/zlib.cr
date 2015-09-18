@@ -38,7 +38,7 @@ module Zlib
       if @buf_read_amount > 0
         return read_and_consume_buffer(slice)
       else
-        return 0u32
+        return 0
       end
     end
 
@@ -64,7 +64,7 @@ module Zlib
       slice.copy_from((@buf.to_slice + @buf_read_from).to_unsafe, to_read)
       @buf_read_from += to_read
       @buf_read_amount -= to_read
-      to_read
+      to_read.to_i32
     end
 
     private def consume_from_input_and_prepare_output
